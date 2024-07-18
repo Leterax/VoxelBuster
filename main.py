@@ -1,7 +1,7 @@
 # game_client.py
 import logging
 
-LOGLEVEL = logging.WARN
+LOGLEVEL = logging.INFO
 
 # Configure logging for the entire script
 logging.basicConfig(level=LOGLEVEL, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -48,7 +48,7 @@ class GameClient(CameraWindow):
 
         # Initialize chunk buffer
         self.chunk_data_buffer = self.ctx.buffer(
-            b"\x00" * (1024 * 1024 * 1024)
+            b"\x00" * (1024 * 128 * 1024)
         )
 
         # Load shaders
@@ -71,14 +71,10 @@ class GameClient(CameraWindow):
         )
 
         # fill the buffer with some data (plane at y=0)
-        self.data = np.zeros((1024,1024,1024), dtype=np.uint8)
+        self.data = np.zeros((1024, 128, 1024), dtype=np.uint8)
         # set a 16x16x16 cube at 0,0,0
-        self.data[0:16, 0:16, 0:16] = np.random.randint(0, 7, (16, 16, 16))
-
-        # self.camera.set_position(512, 32, 512)
-
-
-        self.chunk_data_buffer.write(self.data.ravel())
+        # self.data[0:16, 0:16, 0:16] = np.random.randint(0, 7, (16, 16, 16), dtype=np.uint8)
+        self.chunk_data_buffer.write(self.data.ravel().tobytes())
 
     def update_chunk(self, chunk_pos, chunk_data):
         """Callback to update a chunk"""
@@ -98,32 +94,32 @@ class GameClient(CameraWindow):
         # print(f"Camera position: {self.camera.position}")
 
         # get updates form network
-        # while not self.network_queue.empty():
-        #     position, chunk_data = self.network_queue.get_nowait()
-        #     c_x, c_y, c_z = position
-        #     c_x, c_y, c_z = c_x + 64, c_y + 32, c_z + 64
-        #     chunk_size = 16
-        #     # Write the chunk data to the buffer
-        #     chunk = np.frombuffer(
-        #         chunk_data, dtype=np.uint8
-        #     ).reshape((chunk_size, chunk_size, chunk_size))
+        while not self.network_queue.empty():
+            position, chunk_data = self.network_queue.get_nowait()
+            c_x, c_y, c_z = position
+            c_x, c_y, c_z = c_x + 64, c_y + 32, c_z + 64
+            chunk_size = 16
+            # Write the chunk data to the buffer
+            chunk = np.frombuffer(
+                chunk_data, dtype=np.uint8
+            ).reshape((chunk_size, chunk_size, chunk_size))
 
-        #     # Swap the axes to match the expected layout
-        #     chunk = np.swapaxes(chunk, 1, 2)
+            # Swap the axes to match the expected layout
+            # chunk = np.swapaxes(chunk, 1, 2)
 
 
 
-        #     print(f"Position {position}, Chunk size: {chunk.shape}, writing to data[{c_x}:{c_x+chunk_size},{c_y}:{c_y+chunk_size},{c_z}:{c_z+chunk_size}]")
-        #     self.data[c_x : c_x + chunk_size, c_y : c_y + chunk_size, c_z : c_z + chunk_size] = chunk
+            print(f"Position {position}, Chunk size: {chunk.shape}, writing to data[{c_x}:{c_x+chunk_size},{c_y}:{c_y+chunk_size},{c_z}:{c_z+chunk_size}]")
+            self.data[c_x : c_x + chunk_size, c_y : c_y + chunk_size, c_z : c_z + chunk_size] = chunk
 
-        #     logging.log(
-        #         logging.INFO,
-        #         f"Writing {len(chunk_data)} bytes to buffer.",
-        #     )
-        #     # Update the buffer with the new data (only the chunk)
-        #     self.chunk_data_buffer.write(
-        #         self.data.ravel()
-        #     )
+            logging.log(
+                logging.INFO,
+                f"Writing {len(chunk_data)} bytes to buffer.",
+            )
+            # Update the buffer with the new data (only the chunk)
+            self.chunk_data_buffer.write(
+                self.data.ravel()
+            )
 
 
         # Bind the framebuffer
